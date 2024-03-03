@@ -60,33 +60,29 @@ export default function Spectrogram(props: SpectrogramProps) {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
 
+    const nextPos = (canvasPos.current + 1) % canvas.width;
+
+    // this makes the rest of the canvas darker for some reason
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "black";
+    ctx.beginPath();
+    ctx.moveTo(nextPos, 0);
+    ctx.lineTo(nextPos, canvas.height);
+    ctx.stroke();
+
     renderSpectrogramLine(
       stft.slice(0, props.showFreqs),
       ctx,
       canvasPos.current,
       canvas.height
     );
-    canvasPos.current = (canvasPos.current + 1) % canvas.width;
 
-    // this makes the rest of the canvas darker for some reason
-    /*
-    if(canvasPos.current < canvas.width) {
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "black";
-      ctx.globalAlpha = 255;
-      ctx.beginPath();
-      const x = canvasPos.current;
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    */
-
+    canvasPos.current = nextPos;
     animationController = requestAnimationFrame(incrementSpectrogram);
   };
 
-  const audioContext = new AudioContext();
   if (props.recording) {
+    const audioContext = new AudioContext();
     if (props.stream && !source.current) {
       source.current = audioContext.createMediaStreamSource(props.stream!);
       analyzer.current = audioContext.createAnalyser();
