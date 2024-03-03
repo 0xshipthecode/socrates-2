@@ -5,7 +5,7 @@ import Spectrogram from "./components/Spectrogram";
 export default function App() {
   const fftSize = 1024;
 
-  const [showFreqs, setShowFreqs] = useState(512);
+  const [showFreqs, setShowFreqs] = useState(256);
   const [stream, setStream] = useState<MediaStream | undefined>(undefined);
 
   const updateRecordingStatus = (newStatus: boolean) => {
@@ -41,7 +41,6 @@ export default function App() {
           id="fft-show"
           onChange={(e) => setShowFreqs(parseInt(e.target.value))}
         >
-          <option value="512">512</option>
           <option value="256">256</option>
           <option value="128">128</option>
         </select>

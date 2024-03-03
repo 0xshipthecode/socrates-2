@@ -8,7 +8,7 @@ interface SpectrogramProps {
 }
 
 export default function Spectrogram(props: SpectrogramProps) {
-  let animationController = -1;
+  const animationController = useRef(-1);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const source = useRef<AudioNode>();
   const analyzer = useRef<AnalyserNode>();
@@ -78,30 +78,35 @@ export default function Spectrogram(props: SpectrogramProps) {
     );
 
     canvasPos.current = nextPos;
-    animationController = requestAnimationFrame(incrementSpectrogram);
+    animationController.current = requestAnimationFrame(incrementSpectrogram);
   };
 
   if (props.recording) {
     const audioContext = new AudioContext();
-    if (props.stream && !source.current) {
-      source.current = audioContext.createMediaStreamSource(props.stream!);
-      analyzer.current = audioContext.createAnalyser();
-      analyzer.current.fftSize = props.fftSize;
-      source.current.connect(analyzer.current);
-      if (animationController < 0) incrementSpectrogram();
+    if (props.stream) {
+      if (!source.current) {
+        source.current = audioContext.createMediaStreamSource(props.stream!);
+        analyzer.current = audioContext.createAnalyser();
+        analyzer.current.fftSize = props.fftSize;
+        source.current.connect(analyzer.current);
+      }
+      // we re-start the animation forcibly since even if just the fftShow parameter
+      // has been changed the closure needs to be made again to pick up the update
+      console.log(`cancelling ${animationController.current}`);
+      cancelAnimationFrame(animationController.current);
+      animationController.current = requestAnimationFrame(incrementSpectrogram);
     }
   } else {
     source.current = undefined;
     analyzer.current = undefined;
-    cancelAnimationFrame(animationController);
-    animationController = -1;
+    cancelAnimationFrame(animationController.current);
   }
 
   return (
     <canvas
       ref={canvasRef}
       width={786}
-      height={512}
+      height={256}
       style={{ border: "1px solid #ffffff" }}
     />
   );
