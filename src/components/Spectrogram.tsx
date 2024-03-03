@@ -14,8 +14,6 @@ export default function Spectrogram(props: SpectrogramProps) {
   const analyzer = useRef<AnalyserNode>();
   const canvasPos = useRef(0);
 
-  console.log(props);
-
   const generateHeatMapColors = (): Uint8ClampedArray[] => {
     const colors = new Array(256);
     for (let i = 0; i < 256; i++) {
