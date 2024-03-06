@@ -73,7 +73,7 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
   const incrementSpectrogram = () => {
     if (!canvasRef.current || !analyzer.current) return;
 
-    const stft = new Uint8Array(props.fftSize / 2);
+    const stft = new Uint8Array(props.showFreqs);
     analyzer.current!.getByteFrequencyData(stft);
 
     const canvas = canvasRef.current!;
@@ -89,12 +89,7 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
     ctx.lineTo(nextPos, canvas.height);
     ctx.stroke();
 
-    renderSpectrogramLine(
-      stft.slice(0, props.showFreqs),
-      ctx,
-      canvasPos.current,
-      canvas.height
-    );
+    renderSpectrogramLine(stft, ctx, canvasPos.current, canvas.height);
 
     canvasPos.current = nextPos;
     animationController.current = requestAnimationFrame(incrementSpectrogram);
@@ -103,7 +98,7 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
   const drawFrequencies = () => {
     if (!canvasRef.current || !analyzer.current) return;
 
-    const stft = new Uint8Array(props.fftSize / 2);
+    const stft = new Uint8Array(props.showFreqs);
     analyzer.current!.getByteFrequencyData(stft);
 
     const canvas = canvasRef.current!;
@@ -113,10 +108,15 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = "white";
-    const barStep = canvas.width / stft.length;
+    const barStep = Math.round(canvas.width / stft.length);
     const barWidth = Math.round(barStep / 2);
     const dh = (1.0 / 255) * canvas.height;
+
+    const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grd.addColorStop(0, "rgb(255,0,0)");
+    grd.addColorStop(1, "rgb(0,255,0)");
+    ctx.fillStyle = grd;
+
     for (let i = 0; i < stft.length; i++) {
       const x = i * barStep;
       const h = stft[i] / dh;
@@ -161,7 +161,7 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
   return (
     <canvas
       ref={canvasRef}
-      width={786}
+      width={1024}
       height={256}
       color="rgb(0,255,0)"
       style={{ border: "1px solid #ffffff" }}
