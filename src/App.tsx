@@ -1,5 +1,5 @@
 import "./App.css";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Spectrogram from "./components/Spectrogram";
 
 export default function App() {
@@ -7,6 +7,7 @@ export default function App() {
 
   const [showFreqs, setShowFreqs] = useState(256);
   const [stream, setStream] = useState<MediaStream | undefined>(undefined);
+  const spectrogramRef = useRef<typeof Spectrogram>();
 
   const updateRecordingStatus = (newStatus: boolean) => {
     if (newStatus) {
@@ -44,9 +45,16 @@ export default function App() {
           <option value="256">256</option>
           <option value="128">128</option>
         </select>
+        <button
+          style={{ margin: "0.5em" }}
+          onClick={() => spectrogramRef.current?.clearTheCanvas()}
+        >
+          Clear
+        </button>
       </div>
       <div>
         <Spectrogram
+          ref={spectrogramRef}
           showFreqs={showFreqs}
           fftSize={fftSize}
           stream={stream}

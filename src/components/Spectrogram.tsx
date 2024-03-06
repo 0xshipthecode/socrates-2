@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
 interface SpectrogramProps {
   fftSize: number;
@@ -7,12 +7,30 @@ interface SpectrogramProps {
   stream: MediaStream | undefined;
 }
 
-export default function Spectrogram(props: SpectrogramProps) {
+const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
+  // export default function Spectrogram(props: SpectrogramProps) {
   const animationController = useRef(-1);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const source = useRef<AudioNode>();
   const analyzer = useRef<AnalyserNode>();
   const canvasPos = useRef(0);
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "rgb(0,255,128)";
+    ctx.fill();
+    canvasPos.current = 0;
+  };
+
+  useEffect(clearCanvas, [canvasRef]);
+
+  useImperativeHandle(ref, () => ({
+    clearTheCanvas() {
+      clearCanvas();
+    },
+  }));
 
   const generateHeatMapColors = (): Uint8ClampedArray[] => {
     const colors = new Array(256);
@@ -92,7 +110,6 @@ export default function Spectrogram(props: SpectrogramProps) {
       }
       // we re-start the animation forcibly since even if just the fftShow parameter
       // has been changed the closure needs to be made again to pick up the update
-      console.log(`cancelling ${animationController.current}`);
       cancelAnimationFrame(animationController.current);
       animationController.current = requestAnimationFrame(incrementSpectrogram);
     }
@@ -107,7 +124,10 @@ export default function Spectrogram(props: SpectrogramProps) {
       ref={canvasRef}
       width={786}
       height={256}
+      color="rgb(0,255,0)"
       style={{ border: "1px solid #ffffff" }}
     />
   );
-}
+});
+
+export default Spectrogram;
