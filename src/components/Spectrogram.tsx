@@ -5,6 +5,7 @@ interface SpectrogramProps {
   showFreqs: number;
   recording: boolean;
   stream: MediaStream | undefined;
+  visualizationType: string;
 }
 
 const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
@@ -99,6 +100,32 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
     animationController.current = requestAnimationFrame(incrementSpectrogram);
   };
 
+  const drawFrequencies = () => {
+    if (!canvasRef.current || !analyzer.current) return;
+
+    const stft = new Uint8Array(props.fftSize / 2);
+    analyzer.current!.getByteFrequencyData(stft);
+
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+
+    // clear the display
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "white";
+    const barStep = canvas.width / stft.length;
+    const barWidth = Math.round(barStep / 2);
+    const dh = (1.0 / 255) * canvas.height;
+    for (let i = 0; i < stft.length; i++) {
+      const x = i * barStep;
+      const h = stft[i] / dh;
+      ctx.fillRect(x, canvas.height - h, barWidth, h);
+    }
+
+    animationController.current = requestAnimationFrame(drawFrequencies);
+  };
+
   if (props.recording) {
     const audioContext = new AudioContext();
     if (props.stream) {
@@ -111,7 +138,19 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
       // we re-start the animation forcibly since even if just the fftShow parameter
       // has been changed the closure needs to be made again to pick up the update
       cancelAnimationFrame(animationController.current);
-      animationController.current = requestAnimationFrame(incrementSpectrogram);
+      switch (props.visualizationType) {
+        case "spectrogram":
+          animationController.current =
+            requestAnimationFrame(incrementSpectrogram);
+          break;
+
+        case "frequencies":
+          animationController.current = requestAnimationFrame(drawFrequencies);
+          break;
+
+        default:
+          console.log("invalid vis type");
+      }
     }
   } else {
     source.current = undefined;

@@ -6,6 +6,7 @@ export default function App() {
   const fftSize = 1024;
 
   const [showFreqs, setShowFreqs] = useState(256);
+  const [visualizationType, setVisualizationType] = useState("spectrogram");
   const [stream, setStream] = useState<MediaStream | undefined>(undefined);
   const spectrogramRef = useRef<typeof Spectrogram>();
 
@@ -36,6 +37,7 @@ export default function App() {
         >
           {recording ? "Stop" : "Start"}
         </button>
+        <label># freqs</label>
         <select
           style={{ margin: "0.5em" }}
           name="FFT Show"
@@ -51,11 +53,22 @@ export default function App() {
         >
           Clear
         </button>
+        <select
+          style={{ margin: "0.5em" }}
+          name="Visualization"
+          id="visualization"
+          onChange={(e) => setVisualizationType(e.target.value)}
+        >
+          <option value="spectrogram">Spectrogram</option>
+          <option value="frequencies">Frequencies</option>
+          <option value="cepstral">Cepstral</option>
+        </select>
       </div>
       <div>
         <Spectrogram
           ref={spectrogramRef}
           showFreqs={showFreqs}
+          visualizationType={visualizationType}
           fftSize={fftSize}
           stream={stream}
           recording={recording}
