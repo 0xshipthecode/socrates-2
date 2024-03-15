@@ -1,15 +1,25 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
-interface SpectrogramProps {
+interface AudioVisualizationProps {
+  // size of the FFT in frequencies
   fftSize: number;
+
+  // how many lowest frequencies to display in visualizations
   showFreqs: number;
+
+  // true if recording should be active
   recording: boolean;
+
+  // stream that should be used for recording
   stream: MediaStream | undefined;
+
+  // one of: 'spectrogram', 'frequencies', 'cepstral'
+  // TODO: 'cepstral' is not yet implemented
   visualizationType: string;
 }
 
-const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
-  // export default function Spectrogram(props: SpectrogramProps) {
+const AudioVisualization = forwardRef((props: AudioVisualizationProps, ref) => {
+  // refs to preserve state between re-renderings
   const animationController = useRef(-1);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const source = useRef<AudioNode>();
@@ -19,9 +29,8 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
   const clearCanvas = () => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    ctx.rect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "rgb(0,255,128)";
-    ctx.fill();
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     canvasPos.current = 0;
   };
 
@@ -169,4 +178,4 @@ const Spectrogram = forwardRef((props: SpectrogramProps, ref) => {
   );
 });
 
-export default Spectrogram;
+export default AudioVisualization;

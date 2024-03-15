@@ -1,6 +1,6 @@
 import "./App.css";
 import { useRef, useState } from "react";
-import Spectrogram from "./components/Spectrogram";
+import AudioVisualization from "./components/AudioVisualization";
 
 export default function App() {
   const fftSize = 1024;
@@ -8,7 +8,7 @@ export default function App() {
   const [showFreqs, setShowFreqs] = useState(256);
   const [visualizationType, setVisualizationType] = useState("spectrogram");
   const [stream, setStream] = useState<MediaStream | undefined>(undefined);
-  const spectrogramRef = useRef<typeof Spectrogram>();
+  const spectrogramRef = useRef<typeof AudioVisualization>();
 
   const updateRecordingStatus = (newStatus: boolean) => {
     if (newStatus) {
@@ -65,7 +65,7 @@ export default function App() {
         </select>
       </div>
       <div>
-        <Spectrogram
+        <AudioVisualization
           ref={spectrogramRef}
           showFreqs={showFreqs}
           visualizationType={visualizationType}
