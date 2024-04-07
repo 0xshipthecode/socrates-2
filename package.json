@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.17.1",
+    "@ricky0123/vad-node": "^0.0.2",
+    "@ricky0123/vad-web": "^0.0.17",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "vite-plugin-static-copy": "^1.0.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.56",

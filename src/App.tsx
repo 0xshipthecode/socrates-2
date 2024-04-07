@@ -1,6 +1,7 @@
 import "./App.css";
 import { useRef, useState } from "react";
 import AudioVisualization from "./components/AudioVisualization";
+import SpeechProcessing from "./components/SpeechProcessing.tsx";
 
 export default function App() {
   const fftSize = 1024;
@@ -73,6 +74,7 @@ export default function App() {
           stream={stream}
           recording={recording}
         />
+        <SpeechProcessing stream={stream} recording={recording} />
       </div>
     </div>
   );
