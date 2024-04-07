@@ -1,5 +1,5 @@
 import { MicVAD } from "@ricky0123/vad-web";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 interface VADProps {
   stream: MediaStream | undefined;
@@ -12,15 +12,13 @@ interface TranscriptionResult {
 }
 
 const SpeechProcessing = (props: VADProps) => {
-  const vad = useRef<MicVAD>();
-  const vadLock = useRef<boolean>();
+  const vad = useRef<MicVAD | null>(null);
   const [transcriptions, setTranscriptions] = useState<string[]>([]);
   const [detectorState, setDetectorState] = useState("waiting");
 
   const updateTexts = (result: TranscriptionResult) => {
     const newText = result.status == "success" ? result.text : "Nepodarilo se";
-    const newTexts = [newText];
-    setTranscriptions(newTexts);
+    setTranscriptions((texts) => [newText, ...texts.slice(0, 5)]);
     setDetectorState("waiting");
   };
 
@@ -50,42 +48,33 @@ const SpeechProcessing = (props: VADProps) => {
     return result;
   }
 
-  if (props.recording) {
-    if (props.stream) {
-      if (!vadLock.current) {
-        vadLock.current = true;
-
-        if (!vad.current) {
-          MicVAD.new({
-            stream: props.stream,
-            onSpeechStart: () => {
-              console.log("speech start detected ...");
-              setDetectorState("in speech");
-            },
-            onSpeechEnd: (audio) => {
-              console.log(`speech done with ${audio.length} samples`);
-              sendSpeechToBackend(audio).then((newText) =>
-                updateTexts(newText)
-              );
-            },
-            onVADMisfire: () => {
-              console.log("speech was too short, misfire");
-            },
-          }).then((newVAD: MicVAD) => {
-            newVAD.start();
-            console.log("vad started ...");
-            vad.current = newVAD;
-            vadLock.current = false;
-          });
-        }
-      }
-    } else {
-      if (vad.current) {
-        vad.current.destroy();
-        vad.current = undefined;
-      }
+  useEffect(() => {
+    if (props.recording && !vad.current) {
+      MicVAD.new({
+        stream: props.stream,
+        onSpeechStart: () => {
+          console.log("speech start detected ...");
+          setDetectorState("in speech");
+        },
+        onSpeechEnd: (audio) => {
+          console.log(`speech done with ${audio.length} samples`);
+          sendSpeechToBackend(audio).then((newText) => updateTexts(newText));
+        },
+        onVADMisfire: () => {
+          console.log("speech was too short, misfire");
+        },
+      }).then((newVAD: MicVAD) => {
+        newVAD.start();
+        console.log("vad started ...");
+        vad.current = newVAD;
+      });
     }
-  }
+
+    return () => {
+      vad.current?.destroy();
+      vad.current = null;
+    };
+  }, [props.stream, props.recording]);
 
   return (
     <div>
