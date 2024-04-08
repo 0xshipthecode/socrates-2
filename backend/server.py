@@ -1,4 +1,5 @@
 from faster_whisper import WhisperModel
+import anthropic
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +7,7 @@ from pydantic import BaseModel
 
 import base64
 import numpy as np
+import os
 
 
 app = FastAPI()
@@ -22,7 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# initialize models/access to models
 whisper = WhisperModel("large-v3", compute_type="int8")
+client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
 class TranscribeData(BaseModel):
@@ -48,3 +52,27 @@ async def transcribe(item: TranscribeData):
     except Exception as e:
         print(e)
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class LLMQueryData(BaseModel):
+    prompt: str
+    query: str
+
+
+@app.post("/claude")
+async def get_claude_response(query: LLMQueryData):
+    try:
+        msg = anthropic.Anthropic().messages.create(
+            model="claude-3-sonnet-20240229",
+            max_tokens=256,
+            messages=[
+                {"role": "user", "content": query.query}
+            ])
+        print(msg)
+        return {"status": "success", "text": msg.content[0].text}
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
