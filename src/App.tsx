@@ -2,6 +2,7 @@ import "./App.css";
 import { useRef, useState } from "react";
 import AudioVisualization from "./components/AudioVisualization";
 import SpeechProcessing from "./components/SpeechProcessing.tsx";
+import PumpkinHead from "./components/PumpkinHead.tsx";
 
 export default function App() {
   const fftSize = 1024;
@@ -66,6 +67,7 @@ export default function App() {
         </select>
       </div>
       <div>
+        {/*
         <AudioVisualization
           ref={spectrogramRef}
           showFreqs={showFreqs}
@@ -74,6 +76,8 @@ export default function App() {
           stream={stream}
           recording={recording}
         />
+  */}
+        <PumpkinHead />
         <SpeechProcessing stream={stream} recording={recording} />
       </div>
     </div>
