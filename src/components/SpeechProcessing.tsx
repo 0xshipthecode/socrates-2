@@ -16,16 +16,17 @@ const SpeechProcessing = (props: VADProps) => {
   const [transcriptions, setTranscriptions] = useState<string[]>([]);
   const [detectorState, setDetectorState] = useState("waiting");
 
+  // this should in fact store/load query/response pairs from database
   const updateTexts = (result: TranscriptionResult) => {
     const newText = result.status == "success" ? result.text : "Nepodarilo se";
-    setTranscriptions((texts) => [newText, ...texts.slice(0, 5)]);
+    setTranscriptions((texts: string[]) => [newText, ...texts.slice(0, 5)]);
     setDetectorState("waiting");
   };
 
   async function sendSpeechToBackend(audio: Float32Array) {
-    const base64url: Blob = await new Promise((r) => {
+    const base64url: string = await new Promise((r) => {
       const reader = new FileReader();
-      reader.onload = () => r(reader.result);
+      reader.onload = () => r(reader.result as string);
       reader.readAsDataURL(new Blob([audio]));
     });
 
@@ -56,7 +57,7 @@ const SpeechProcessing = (props: VADProps) => {
           console.log("speech start detected ...");
           setDetectorState("in speech");
         },
-        onSpeechEnd: (audio) => {
+        onSpeechEnd: (audio: Float32Array) => {
           console.log(`speech done with ${audio.length} samples`);
           sendSpeechToBackend(audio).then((newText) => updateTexts(newText));
         },
