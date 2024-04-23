@@ -1,4 +1,5 @@
 from faster_whisper import WhisperModel
+import openai
 import anthropic
 
 from fastapi import FastAPI, HTTPException
@@ -26,7 +27,8 @@ app.add_middleware(
 
 # initialize models/access to models
 whisper = WhisperModel("large-v3", compute_type="int8")
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+claudeClient = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+openaiClient = openai.Client(api_key=os.environ["OPENAI_API_KEY"])
 
 
 class TranscribeData(BaseModel):
@@ -59,20 +61,39 @@ class LLMQueryData(BaseModel):
     query: str
 
 
+class ProcessingResult(BaseModel):
+    status: str
+    text: str
+
+
 @app.post("/claude")
-async def get_claude_response(query: LLMQueryData):
+async def get_claude_response(query: LLMQueryData) -> ProcessingResult:
     try:
-        msg = anthropic.Anthropic().messages.create(
+        msg = claudeClient.messages.create(
             model="claude-3-sonnet-20240229",
             max_tokens=256,
-            messages=[
-                {"role": "user", "content": query.query}
-            ])
+            messages=[{"role": "user", "content": query.query}],
+        )
         print(msg)
-        return {"status": "success", "text": msg.content[0].text}
+        return ProcessingResult(status="success", text=msg.content[0].text)
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
+@app.post("/chatgpt")
+async def get_chatgpt_response(query: LLMQueryData) -> ProcessingResult:
+    try:
+        msg = openaiClient.chat.completions.create(
+            model="gpt-4-turbo",
+            max_tokens=256,
+            messages=[
+                {"role": "system", "content": query.prompt},
+                {"role": "user", "content": query.query},
+            ],
+        )
+        print(msg)
+        return ProcessingResult(status="success", text=msg.choices[0].message.content)
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))

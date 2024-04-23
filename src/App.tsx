@@ -8,7 +8,7 @@ export default function App() {
   const fftSize = 1024;
 
   const [showFreqs, setShowFreqs] = useState(256);
-  const [visualizationType, setVisualizationType] = useState("spectrogram");
+  const [visualizationType, setVisualizationType] = useState("pumpkin");
   const [stream, setStream] = useState<MediaStream | undefined>(undefined);
   const spectrogramRef = useRef<typeof AudioVisualization>();
 
@@ -61,23 +61,25 @@ export default function App() {
           id="visualization"
           onChange={(e) => setVisualizationType(e.target.value)}
         >
+          <option value="pumpkin">Pumpkin head</option>
           <option value="spectrogram">Spectrogram</option>
           <option value="frequencies">Frequencies</option>
           <option value="cepstral">Cepstral</option>
         </select>
       </div>
       <div>
-        {/*
-        <AudioVisualization
-          ref={spectrogramRef}
-          showFreqs={showFreqs}
-          visualizationType={visualizationType}
-          fftSize={fftSize}
-          stream={stream}
-          recording={recording}
-        />
-  */}
-        <PumpkinHead />
+        {(visualizationType === "spectrogram" ||
+          visualizationType == "frequencies") && (
+          <AudioVisualization
+            ref={spectrogramRef}
+            showFreqs={showFreqs}
+            visualizationType={visualizationType}
+            fftSize={fftSize}
+            stream={stream}
+            recording={recording}
+          />
+        )}
+        {visualizationType === "pumpkin" && <PumpkinHead stream={stream} />}
         <SpeechProcessing stream={stream} recording={recording} />
       </div>
     </div>

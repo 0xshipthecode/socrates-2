@@ -6,7 +6,7 @@ interface VADProps {
   recording: boolean;
 }
 
-interface TranscriptionResult {
+interface ProcessingResult {
   status: string;
   text: string;
 }
@@ -17,13 +17,15 @@ const SpeechProcessing = (props: VADProps) => {
   const [detectorState, setDetectorState] = useState("waiting");
 
   // this should in fact store/load query/response pairs from database
-  const updateTexts = (result: TranscriptionResult) => {
+  const updateTexts = (result: ProcessingResult) => {
     const newText = result.status == "success" ? result.text : "Nepodarilo se";
     setTranscriptions((texts: string[]) => [newText, ...texts.slice(0, 5)]);
     setDetectorState("waiting");
   };
 
-  async function sendSpeechToBackend(audio: Float32Array) {
+  async function sendSpeechToBackend(
+    audio: Float32Array
+  ): Promise<ProcessingResult> {
     const base64url: string = await new Promise((r) => {
       const reader = new FileReader();
       reader.onload = () => r(reader.result as string);
@@ -49,6 +51,32 @@ const SpeechProcessing = (props: VADProps) => {
     return result;
   }
 
+  const mysakPrompt =
+    "Jsi asistent Myšák, který se snaží být nápomocný Adélce, osmileté holčičce.";
+
+  async function processUtterance(utterance: ProcessingResult) {
+    if (utterance.status === "success") {
+      setDetectorState("thinking ...");
+      const response = await fetch("http://localhost:8080/chatgpt", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt: mysakPrompt, query: utterance.text }),
+      });
+
+      const result: ProcessingResult = await response.json();
+
+      if (result.status === "success") {
+        updateTexts(result);
+      } else {
+        updateTexts({ status: "query_failed", text: utterance.text });
+      }
+    } else {
+      updateTexts({ status: "transcription_failed", text: "" });
+    }
+  }
+
   useEffect(() => {
     if (props.recording && !vad.current) {
       MicVAD.new({
@@ -59,7 +87,7 @@ const SpeechProcessing = (props: VADProps) => {
         },
         onSpeechEnd: (audio: Float32Array) => {
           console.log(`speech done with ${audio.length} samples`);
-          sendSpeechToBackend(audio).then((newText) => updateTexts(newText));
+          sendSpeechToBackend(audio).then((result) => processUtterance(result));
         },
         onVADMisfire: () => {
           console.log("speech was too short, misfire");

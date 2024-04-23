@@ -1,17 +1,33 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { useAudioLevel } from "../hooks/useAudioLevel";
 
 interface PumpkinHeadProps {
+  stream: MediaStream | undefined;
   // empty
 }
 
-const PumpkinHead = (props: PumpkinHeadProps) => {
+const PumpkinHead = ({ stream }: PumpkinHeadProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationController = useRef(-1);
+  const volume = useAudioLevel(stream);
+  //TODO: this needs to be smarter and scale to ambient/speaker volume
+  const mouthLevel = Math.min(volume * 2.5, 1.0);
 
   const drawPumpkin = (ctx: CanvasRenderingContext2D) => {
     ctx.save();
-    ctx.translate(200, 200);
+    ctx.translate(300, 300);
     ctx.scale(100, 100);
+
+    drawHead(ctx);
+    drawEyes(ctx);
+    drawNose(ctx);
+    drawMouth(ctx);
+
+    ctx.restore();
+  };
+
+  const drawHead = (ctx: CanvasRenderingContext2D) => {
+    ctx.save();
 
     ctx.fillStyle = "gray";
     ctx.beginPath();
@@ -42,24 +58,101 @@ const PumpkinHead = (props: PumpkinHeadProps) => {
     ctx.restore();
   };
 
+  const drawNose = (ctx: CanvasRenderingContext2D) => {
+    ctx.save();
+    ctx.translate(-0.1, -0.05);
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.moveTo(-0.05, 0);
+    ctx.lineTo(0.05, -0.05);
+    ctx.lineTo(0.05, 0.05);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(0.1, -0.05);
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.moveTo(0.05, 0);
+    ctx.lineTo(-0.05, -0.05);
+    ctx.lineTo(-0.05, 0.05);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  const drawEyes = (ctx: CanvasRenderingContext2D) => {
+    ctx.save();
+    ctx.translate(-0.4, -0.4);
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.moveTo(-0.12, 0);
+    ctx.lineTo(0.12, -0.12);
+    ctx.lineTo(0.12, 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(0.4, -0.4);
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.moveTo(0.12, 0);
+    ctx.lineTo(-0.12, -0.12);
+    ctx.lineTo(-0.12, 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
   const drawMouth = (ctx: CanvasRenderingContext2D) => {
-    // empty
+    ctx.fillStyle = "black";
+    ctx.save();
+
+    ctx.translate(0, 0.4);
+    ctx.scale(1, 0.2 + mouthLevel);
+
+    ctx.beginPath();
+    ctx.moveTo(-0.6, 0);
+    ctx.lineTo(-0.4, -0.17);
+    ctx.lineTo(-0.2, -0.08);
+    ctx.lineTo(0, -0.2);
+    ctx.lineTo(+0.2, -0.08);
+    ctx.lineTo(+0.4, -0.17);
+    ctx.lineTo(0.6, 0);
+    ctx.lineTo(+0.4, 0.17);
+    ctx.lineTo(+0.2, 0.08);
+    ctx.lineTo(0, 0.2);
+    ctx.lineTo(-0.2, 0.08);
+    ctx.lineTo(-0.4, 0.17);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   };
 
   const drawEars = (ctx: CanvasRenderingContext2D) => {
-    // empty
+    // draw ears just below eye level
   };
 
-  const drawFrame = () => {
-    if (!canvasRef.current) return;
+  useEffect(() => {
+    const drawFrame = () => {
+      if (!canvasRef.current) return;
 
-    const ctx = canvasRef.current!.getContext("2d")!;
-    drawPumpkin(ctx);
-  };
+      const ctx = canvasRef.current!.getContext("2d")!;
+      drawPumpkin(ctx);
+    };
 
-  requestAnimationFrame(drawFrame);
+    animationController.current = requestAnimationFrame(drawFrame);
 
-  return <canvas ref={canvasRef} width={400} height={400} />;
+    return () => {
+      cancelAnimationFrame(animationController.current);
+      animationController.current = -1;
+    };
+  });
+
+  return <canvas ref={canvasRef} width={600} height={600} />;
 };
 
 export default PumpkinHead;
