@@ -13,6 +13,7 @@ dist-ssr
 *.local
 
 
+backend/run-server.sh
 env-backend
 __pycache__
 
@@ -31,3 +32,6 @@ __pycache__
 samples
 models
 .env
+
+# secrets
+src/config/socrates.json
