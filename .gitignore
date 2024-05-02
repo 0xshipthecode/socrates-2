@@ -32,3 +32,6 @@ __pycache__
 samples
 models
 .env
+
+# secrets
+src/config/socrates.json

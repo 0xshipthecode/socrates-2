@@ -1,9 +1,12 @@
 import { MicVAD } from "@ricky0123/vad-web";
 import { useState, useRef, useEffect } from "react";
+import { PrincipalConfig, AssistantConfig } from "../config/types";
 
 interface VADProps {
   stream: MediaStream | undefined;
   recording: boolean;
+  assistant: AssistantConfig;
+  principal: PrincipalConfig;
 }
 
 interface ProcessingResult {
@@ -18,8 +21,17 @@ const SpeechProcessing = (props: VADProps) => {
 
   // this should in fact store/load query/response pairs from database
   const updateTexts = (result: ProcessingResult) => {
-    const newText = result.status == "success" ? result.text : "Nepodarilo se";
-    setTranscriptions((texts: string[]) => [newText, ...texts.slice(0, 5)]);
+    switch (result.status) {
+      case "add_new":
+        setTranscriptions((texts: string[]) => [result.text, ...texts.slice(0, 5)]);
+        break;
+      case "update":
+        setTranscriptions((texts: string[]) => [result.text, ...texts.slice(1, 5)]);
+        break;
+      default:
+        console.log(`failed to process ${result}`);
+        break;
+    }
     setDetectorState("waiting");
   };
 
@@ -51,29 +63,121 @@ const SpeechProcessing = (props: VADProps) => {
     return result;
   }
 
-  const mysakPrompt =
-    "Jsi asistent Myšák, který se snaží být nápomocný Adélce, osmileté holčičce.";
 
   async function processUtterance(utterance: ProcessingResult) {
     if (utterance.status === "success") {
       setDetectorState("thinking ...");
-      const response = await fetch("http://localhost:8080/chatgpt", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt: mysakPrompt, query: utterance.text }),
-      });
 
-      const result: ProcessingResult = await response.json();
+      // NB: must have 2 servers running else concurrency fails
+      const speechWs = new WebSocket("ws://localhost:8081/speak");
+      const chatWs = new WebSocket("ws://localhost:8080/chat");
+      speechWs.binaryType = 'arraybuffer';
 
-      if (result.status === "success") {
-        updateTexts(result);
-      } else {
-        updateTexts({ status: "query_failed", text: utterance.text });
+      let response = "";
+      let speakBuffer = "";
+      let speechQueue: string[] = [];
+      let playQueue: Float32Array[] = [];
+
+      const audioCtx = new AudioContext();
+      let playing = false;
+
+
+      const flushSpeechQueue = () => {
+        console.log(`flushing speechQueue ${speechQueue}`);
+        while (speechQueue.length > 0) {
+          speechWs.send(speechQueue[0]);
+          speechQueue = speechQueue.slice(1);
+        }
+      };
+
+      const sendOrQueueBuffer = (buf: string) => {
+        console.log(`queuing ${buf} with socket status ${speechWs.readyState}`);
+        speechQueue.push(buf);
+        if (speechWs.readyState === speechWs.OPEN) {
+          flushSpeechQueue();
+        }
       }
-    } else {
-      updateTexts({ status: "transcription_failed", text: "" });
+
+      const delay = (ms: number) => {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      const startPlayer = async () => {
+        if(playing) return;
+        playing = true;
+        while (playQueue.length > 0) {
+          const flt32 = playQueue.shift()!;
+
+          const buffer = audioCtx.createBuffer(1, flt32.length, 22050);
+          buffer.getChannelData(0).set(flt32);
+
+          const srcNode = audioCtx.createBufferSource();
+          srcNode.buffer = buffer;
+          srcNode.connect(audioCtx.destination);
+
+          srcNode.start();
+          playing = true;
+
+          await delay(Math.round(flt32.length * 1000 / 22050) + 50);
+        }
+      }
+
+
+        speechWs.onmessage = (event) => {
+          const count = event.data.byteLength / 2;
+          const int16 = new Int16Array(event.data);
+          const flt32 = new Float32Array(count);
+          for (let i = 0; i < count; i++) {
+            flt32[i] = int16[i] / 16384;
+          }
+
+          console.log(`Audio received: ${count} samples, audio ctx sample rate is ${audioCtx.sampleRate}`);
+
+          playQueue.push(flt32);
+          startPlayer();
+        }
+
+        chatWs.onmessage = (event) => {
+          if (response.length == 0) {
+            // initialize new response
+            updateTexts({ "status": "add_new", text: "" });
+          }
+
+          if (event.data === "<RESPCOMPLETE>") {
+            console.log(`response completed - closing CHAT websocket`);
+            chatWs.close();
+            if (speakBuffer != "") {
+              sendOrQueueBuffer(speakBuffer);
+            }
+            sendOrQueueBuffer("<END>");
+          } else {
+            response = response.concat(event.data);
+            for (const ch of event.data) {
+              speakBuffer = speakBuffer.concat(ch);
+              if ('!.?'.includes(ch)) {
+                sendOrQueueBuffer(speakBuffer);
+                speakBuffer = "";
+              }
+            }
+
+            updateTexts({ "status": "update", text: response });
+          }
+        }
+
+        // fire off the query
+        chatWs.onopen = () => chatWs.send(JSON.stringify({
+          model: "chatgpt",
+          prompt: props.assistant.prompt + "\n\n" + props.principal.prompt ,
+          query: utterance.text
+        }));
+
+        speechWs.onopen = () => {
+          console.log('finally SPEAK ws is open');
+          flushSpeechQueue();
+        };
+
+      } else {
+        updateTexts({ status: "transcription_failed", text: "" });
     }
   }
 
