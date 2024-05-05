@@ -23,10 +23,16 @@ const SpeechProcessing = (props: VADProps) => {
   const updateTexts = (result: ProcessingResult) => {
     switch (result.status) {
       case "add_new":
-        setTranscriptions((texts: string[]) => [result.text, ...texts.slice(0, 5)]);
+        setTranscriptions((texts: string[]) => [
+          result.text,
+          ...texts.slice(0, 5),
+        ]);
         break;
       case "update":
-        setTranscriptions((texts: string[]) => [result.text, ...texts.slice(1, 5)]);
+        setTranscriptions((texts: string[]) => [
+          result.text,
+          ...texts.slice(1, 5),
+        ]);
         break;
       default:
         console.log(`failed to process ${result}`);
@@ -36,7 +42,7 @@ const SpeechProcessing = (props: VADProps) => {
   };
 
   async function sendSpeechToBackend(
-    audio: Float32Array
+    audio: Float32Array,
   ): Promise<ProcessingResult> {
     const base64url: string = await new Promise((r) => {
       const reader = new FileReader();
@@ -63,15 +69,13 @@ const SpeechProcessing = (props: VADProps) => {
     return result;
   }
 
-
   async function processUtterance(utterance: ProcessingResult) {
     if (utterance.status === "success") {
       setDetectorState("thinking ...");
 
-      // NB: must have 2 servers running else concurrency fails
-      const speechWs = new WebSocket("ws://localhost:8081/speak");
-      const chatWs = new WebSocket("ws://localhost:8080/chat");
-      speechWs.binaryType = 'arraybuffer';
+      const speechWs = new WebSocket("ws://localhost:8082/speak");
+      const chatWs = new WebSocket("ws://localhost:8081/chat");
+      speechWs.binaryType = "arraybuffer";
 
       let response = "";
       let speakBuffer = "";
@@ -80,7 +84,6 @@ const SpeechProcessing = (props: VADProps) => {
 
       const audioCtx = new AudioContext();
       let playing = false;
-
 
       const flushSpeechQueue = () => {
         console.log(`flushing speechQueue ${speechQueue}`);
@@ -96,14 +99,14 @@ const SpeechProcessing = (props: VADProps) => {
         if (speechWs.readyState === speechWs.OPEN) {
           flushSpeechQueue();
         }
-      }
+      };
 
       const delay = (ms: number) => {
-        return new Promise(resolve => setTimeout(resolve, ms));
-      }
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      };
 
       const startPlayer = async () => {
-        if(playing) return;
+        if (playing) return;
         playing = true;
         while (playQueue.length > 0) {
           const flt32 = playQueue.shift()!;
@@ -118,66 +121,69 @@ const SpeechProcessing = (props: VADProps) => {
           srcNode.start();
           playing = true;
 
-          await delay(Math.round(flt32.length * 1000 / 22050) + 50);
+          await delay(Math.round((flt32.length * 1000) / 22050) + 50);
         }
-      }
+      };
 
-
-        speechWs.onmessage = (event) => {
-          const count = event.data.byteLength / 2;
-          const int16 = new Int16Array(event.data);
-          const flt32 = new Float32Array(count);
-          for (let i = 0; i < count; i++) {
-            flt32[i] = int16[i] / 16384;
-          }
-
-          console.log(`Audio received: ${count} samples, audio ctx sample rate is ${audioCtx.sampleRate}`);
-
-          playQueue.push(flt32);
-          startPlayer();
+      speechWs.onmessage = (event) => {
+        const count = event.data.byteLength / 2;
+        const int16 = new Int16Array(event.data);
+        const flt32 = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+          flt32[i] = int16[i] / 16384;
         }
 
-        chatWs.onmessage = (event) => {
-          if (response.length == 0) {
-            // initialize new response
-            updateTexts({ "status": "add_new", text: "" });
-          }
+        console.log(
+          `Audio received: ${count} samples, audio ctx sample rate is ${audioCtx.sampleRate}`,
+        );
 
-          if (event.data === "<RESPCOMPLETE>") {
-            console.log(`response completed - closing CHAT websocket`);
-            chatWs.close();
-            if (speakBuffer != "") {
+        playQueue.push(flt32);
+        startPlayer();
+      };
+
+      chatWs.onmessage = (event) => {
+        if (response.length == 0) {
+          // initialize new response
+          updateTexts({ status: "add_new", text: "" });
+        }
+
+        if (event.data === "<RESPCOMPLETE>") {
+          console.log(`response completed - closing CHAT websocket`);
+          chatWs.close();
+          if (speakBuffer != "") {
+            sendOrQueueBuffer(speakBuffer);
+          }
+          sendOrQueueBuffer("<END>");
+        } else {
+          response = response.concat(event.data);
+          for (const ch of event.data) {
+            speakBuffer = speakBuffer.concat(ch);
+            if ("!.?".includes(ch)) {
               sendOrQueueBuffer(speakBuffer);
+              speakBuffer = "";
             }
-            sendOrQueueBuffer("<END>");
-          } else {
-            response = response.concat(event.data);
-            for (const ch of event.data) {
-              speakBuffer = speakBuffer.concat(ch);
-              if ('!.?'.includes(ch)) {
-                sendOrQueueBuffer(speakBuffer);
-                speakBuffer = "";
-              }
-            }
-
-            updateTexts({ "status": "update", text: response });
           }
+
+          updateTexts({ status: "update", text: response });
         }
+      };
 
-        // fire off the query
-        chatWs.onopen = () => chatWs.send(JSON.stringify({
-          model: "chatgpt",
-          prompt: props.assistant.prompt + "\n\n" + props.principal.prompt ,
-          query: utterance.text
-        }));
+      // fire off the query
+      chatWs.onopen = () =>
+        chatWs.send(
+          JSON.stringify({
+            model: "chatgpt",
+            prompt: props.assistant.prompt + "\n\n" + props.principal.prompt,
+            query: utterance.text,
+          }),
+        );
 
-        speechWs.onopen = () => {
-          console.log('finally SPEAK ws is open');
-          flushSpeechQueue();
-        };
-
-      } else {
-        updateTexts({ status: "transcription_failed", text: "" });
+      speechWs.onopen = () => {
+        console.log("finally SPEAK ws is open");
+        flushSpeechQueue();
+      };
+    } else {
+      updateTexts({ status: "transcription_failed", text: "" });
     }
   }
 
