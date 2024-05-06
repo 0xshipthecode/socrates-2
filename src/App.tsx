@@ -79,14 +79,14 @@ export default function App() {
         name="Assistant"
         id="assistant"
         onChange={(e) => setAssistant(findAssistant(e.target.value))}>
-          {systemConfig.assistants.map((value) => <option key="${value.name}" value={value.name}>{value.name}</option>)}
+          {systemConfig.assistants.map((value) => <option key={value.name} value={value.name}>{value.name}</option>)}
         </select>
        <select
         style={{ margin: "0.5em" }}
         name="Principal"
         id="principal"
         onChange={(e) => setPrincipal(findPrincipal(e.target.value))}>
-         {systemConfig.principals.map((value) => <option key="${value.name}" value={value.name}>{value.name}</option>)}
+         {systemConfig.principals.map((value) => <option key={value.name} value={value.name}>{value.name}</option>)}
          </select>
       </div>
       <div>

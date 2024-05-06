@@ -1,6 +1,7 @@
 import { MicVAD } from "@ricky0123/vad-web";
 import { useState, useRef, useEffect } from "react";
 import { PrincipalConfig, AssistantConfig } from "../config/types";
+import { TextPlayer } from "../utils/text_player";
 
 interface VADProps {
   stream: MediaStream | undefined;
@@ -73,73 +74,11 @@ const SpeechProcessing = (props: VADProps) => {
     if (utterance.status === "success") {
       setDetectorState("thinking ...");
 
-      const speechWs = new WebSocket("ws://localhost:8082/speak");
       const chatWs = new WebSocket("ws://localhost:8081/chat");
-      speechWs.binaryType = "arraybuffer";
+      const player = new TextPlayer();
 
       let response = "";
       let speakBuffer = "";
-      let speechQueue: string[] = [];
-      let playQueue: Float32Array[] = [];
-
-      const audioCtx = new AudioContext();
-      let playing = false;
-
-      const flushSpeechQueue = () => {
-        console.log(`flushing speechQueue ${speechQueue}`);
-        while (speechQueue.length > 0) {
-          speechWs.send(speechQueue[0]);
-          speechQueue = speechQueue.slice(1);
-        }
-      };
-
-      const sendOrQueueBuffer = (buf: string) => {
-        console.log(`queuing ${buf} with socket status ${speechWs.readyState}`);
-        speechQueue.push(buf);
-        if (speechWs.readyState === speechWs.OPEN) {
-          flushSpeechQueue();
-        }
-      };
-
-      const delay = (ms: number) => {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-      };
-
-      const startPlayer = async () => {
-        if (playing) return;
-        playing = true;
-        while (playQueue.length > 0) {
-          const flt32 = playQueue.shift()!;
-
-          const buffer = audioCtx.createBuffer(1, flt32.length, 22050);
-          buffer.getChannelData(0).set(flt32);
-
-          const srcNode = audioCtx.createBufferSource();
-          srcNode.buffer = buffer;
-          srcNode.connect(audioCtx.destination);
-
-          srcNode.start();
-          playing = true;
-
-          await delay(Math.round((flt32.length * 1000) / 22050) + 50);
-        }
-      };
-
-      speechWs.onmessage = (event) => {
-        const count = event.data.byteLength / 2;
-        const int16 = new Int16Array(event.data);
-        const flt32 = new Float32Array(count);
-        for (let i = 0; i < count; i++) {
-          flt32[i] = int16[i] / 16384;
-        }
-
-        console.log(
-          `Audio received: ${count} samples, audio ctx sample rate is ${audioCtx.sampleRate}`,
-        );
-
-        playQueue.push(flt32);
-        startPlayer();
-      };
 
       chatWs.onmessage = (event) => {
         if (response.length == 0) {
@@ -151,15 +90,15 @@ const SpeechProcessing = (props: VADProps) => {
           console.log(`response completed - closing CHAT websocket`);
           chatWs.close();
           if (speakBuffer != "") {
-            sendOrQueueBuffer(speakBuffer);
+            player.speakText(speakBuffer);
           }
-          sendOrQueueBuffer("<END>");
+          player.speakText("<END>");
         } else {
           response = response.concat(event.data);
           for (const ch of event.data) {
             speakBuffer = speakBuffer.concat(ch);
             if ("!.?".includes(ch)) {
-              sendOrQueueBuffer(speakBuffer);
+              player.speakText(speakBuffer);
               speakBuffer = "";
             }
           }
@@ -177,11 +116,6 @@ const SpeechProcessing = (props: VADProps) => {
             query: utterance.text,
           }),
         );
-
-      speechWs.onopen = () => {
-        console.log("finally SPEAK ws is open");
-        flushSpeechQueue();
-      };
     } else {
       updateTexts({ status: "transcription_failed", text: "" });
     }
